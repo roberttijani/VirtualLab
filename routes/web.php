@@ -37,6 +37,9 @@ Route::group(['middleware' => ['auth', 'mahasiswa']], function() {
     Route::get('/select-table/{database}/{table}', [SQLController1::class, 'selectTable']);
     Route::get('/view-table/{table}', [SQLController1::class, 'viewTable']);
     Route::post('/create-database', [SQLController1::class, 'createDatabase'])->name('create-database');
+    Route::get('/databases', [SQLController1::class, 'getDatabases'])->name('databases');
+    Route::post('/get-history', [SQLController1::class, 'getHistory'])->name('get-history');
+
 
 });
 

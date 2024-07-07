@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQLite Online Clone</title>
+    <title>VIRTUAL LAB SQL</title>
     <link rel="stylesheet" href="{{ asset('vendors/styles.css') }}">
     <link rel="stylesheet" href="{{ asset('vendors/bootstrap.min.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -19,13 +19,8 @@
             <button>File</button>
             <button><i class="fa fa-download"></i> Export</button>
             <button><i class="fa fa-upload"></i> Import</button>
-            <button>Client</button>
         </div>
         <div class="header-right">
-            <button>Sign in</button>
-            <button>
-                <i class="fas fa-envelope"></i>
-            </button>
             <button>
                 <i class="fas fa-cog"></i>
             </button>
@@ -33,11 +28,11 @@
     </header>
     <div class="main-content">
         <div class="sidebar" id="sidebar">
-            <div class="database">
+            <div class="database" id="database-list">
                 @foreach ($databases as $db)
-                <div class="database-header list-group-item collapsed" data-database="{{ $db }}">
+                <div class="database-header list-group-item collapsed" data-database="{{ $db['full'] }}">
                     <i class="fas fa-database"></i>
-                    <span>{{ $db }}</span>
+                    <span>{{ $db['display'] }}</span>
                 </div>
                 <div class="database-content table-list" style="display: none;">
                     @if (!empty($tables))
@@ -58,8 +53,9 @@
             </div>
         </div>
         <div class="editor-container">
-            <form id="create-database-form">
-                <input type="text" name="database_name" placeholder="Enter database name">
+            <form id="create-database-form" action="{{ route('create-database') }}" method="POST">
+                @csrf
+                <input type="text" name="database_name" id="database_name" placeholder="Enter database name" required>
                 <button type="submit">Create Database</button>
             </form>
             <div id="database-message" class="alert alert-info" style="display: {{ session('message') ? 'block' : 'none' }};"></div>
@@ -73,43 +69,25 @@
                 <button type="submit" class="btn btn-primary">Execute</button>
             </form>
             <div id="query-result">
-                {{-- @if (!empty($result)) --}}
                 <h2>Result</h2>
                 <div class="output">
                     <table>
                         <thead>
-                            {{-- @foreach (array_keys((array) $result[0]) as $column)
-                                    <th>{{ $column }}</th>
-                            @endforeach --}}
                         </thead>
                         <tbody id="table-body">
-                            <!-- Example rows -->
-                            {{-- @foreach ($result as $row)
-                                <tr>
-                                    @foreach ((array) $row as $column)
-                                        <td>{{ $column }}</td>
-                                    @endforeach
-                                </tr>
-                            @endforeach --}}
+
                         </tbody>
                     </table>
                 </div>
-                {{-- @endif --}}
+
             </div>
         </div>
-        {{-- <div class="history-sidebar">
+        <div class="history-sidebar">
             <h3>History</h3>
-            <ul>
-                <li><a href="#">Syntax</a></li>
-                <li><a href="#">History</a></li>
-            </ul>
-            <div class="syntax-details">
-                <p>Download remote DB (only SQLite):</p>
-                <p>Example: Chinook | NorthWind | crnf.db | BasketBall | Sakila</p>
-                <p>Example: Chinook SQL</p>
+            <div id="query-history" class="query-history">
                 <!-- Add more details as needed -->
             </div>
-        </div> --}}
+        </div>
     </div>
     <script src="https://kit.fontawesome.com/a076d05399.js"></script>
     <script src="{{ asset('js/scripts2.js') }}"></script>
@@ -128,28 +106,6 @@
             styleActiveLine: true,
             lineWrapping: true // Prevent auto size adjustment
         });
-
-        document.getElementById('create-database-form').addEventListener('submit', function(event) {
-            event.preventDefault();
-
-            var formData = new FormData(this);
-            fetch('{{ route("create-database") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                },
-                body: formData,
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.message);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        });
-
-
     </script>
 </body>
 </html>

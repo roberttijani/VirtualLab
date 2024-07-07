@@ -7,16 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const databaseHeaders = document.querySelectorAll('.database-header');
     databaseHeaders.forEach(header => {
         header.addEventListener('click', function() {
-            // Close other databases
-            databaseHeaders.forEach(otherHeader => {
-                if (otherHeader !== header) {
-                    const otherContent = otherHeader.nextElementSibling;
-                    otherContent.style.display = 'none';
-                    otherHeader.classList.remove('expanded');
-                    otherHeader.classList.add('collapsed');
-                }
-            });
-
+            closeOtherDatabases(header);
             toggleCollapse(header);
             selectDatabase(header.dataset.database);
         });
@@ -27,33 +18,53 @@ document.addEventListener('DOMContentLoaded', function() {
             const tableName = header.dataset.table;
             const databaseName = header.closest('.database-content').previousElementSibling.dataset.database;
 
-            // Close other tables
-            document.querySelectorAll('.table-header').forEach(otherHeader => {
-                if (otherHeader !== header) {
-                    const otherContent = otherHeader.nextElementSibling;
-                    otherContent.style.display = 'none';
-                    otherHeader.classList.remove('expanded');
-                    otherHeader.classList.add('collapsed');
-                }
-            });
-
+            closeOtherTables(header);
             toggleCollapse(header);
             selectTable(databaseName, tableName, header.nextElementSibling);
         });
     });
 
-    if (document.querySelector('.output tbody').children.length === 0) {
-        // Display empty table initially
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `<td colspan="100%">No data available</td>`;
-        document.getElementById('table-body').appendChild(emptyRow);
-    }
-
     document.getElementById('query-form').addEventListener('submit', function(event) {
         event.preventDefault();
         executeQuery();
     });
+
+    document.getElementById('create-database-form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        createDatabase();
+    });
+
+    // Add event listener for selecting a database
+    document.querySelectorAll('.database-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const selectedDatabase = this.getAttribute('data-database');
+            loadHistory(selectedDatabase);
+        });
+    });
 });
+
+function closeOtherDatabases(currentHeader) {
+    const databaseHeaders = document.querySelectorAll('.database-header');
+    databaseHeaders.forEach(otherHeader => {
+        if (otherHeader !== currentHeader) {
+            const otherContent = otherHeader.nextElementSibling;
+            otherContent.style.display = 'none';
+            otherHeader.classList.remove('expanded');
+            otherHeader.classList.add('collapsed');
+        }
+    });
+}
+
+function closeOtherTables(currentHeader) {
+    document.querySelectorAll('.table-header').forEach(otherHeader => {
+        if (otherHeader !== currentHeader) {
+            const otherContent = otherHeader.nextElementSibling;
+            otherContent.style.display = 'none';
+            otherHeader.classList.remove('expanded');
+            otherHeader.classList.add('collapsed');
+        }
+    });
+}
 
 function toggleCollapse(element) {
     const content = element.nextElementSibling;
@@ -72,7 +83,6 @@ function selectDatabase(database) {
     fetch(`/select-database/${database}`)
         .then(response => response.json())
         .then(data => {
-            // Populate tables
             const databaseContent = document.querySelector(`.database-header[data-database="${database}"]`).nextElementSibling;
             databaseContent.innerHTML = '';
 
@@ -82,16 +92,7 @@ function selectDatabase(database) {
                 tableElement.dataset.table = table;
                 tableElement.innerHTML = `<i class="fas fa-table" style="color: orange;"></i><span>${table}</span>`;
                 tableElement.addEventListener('click', function() {
-                    // Close other tables
-                    document.querySelectorAll('.table-header').forEach(otherHeader => {
-                        if (otherHeader !== tableElement) {
-                            const otherContent = otherHeader.nextElementSibling;
-                            otherContent.style.display = 'none';
-                            otherHeader.classList.remove('expanded');
-                            otherHeader.classList.add('collapsed');
-                        }
-                    });
-
+                    closeOtherTables(tableElement);
                     toggleCollapse(tableElement);
                     selectTable(database, table, tableElement.nextElementSibling);
                 });
@@ -109,12 +110,10 @@ function selectDatabase(database) {
             databaseHeader.classList.remove('collapsed');
             databaseHeader.classList.add('expanded');
 
-            // Display selected database message
             const databaseMessage = document.getElementById('database-message');
             databaseMessage.textContent = `Selected Database: ${database}`;
             databaseMessage.style.display = 'block';
 
-            // Update selected database span
             document.getElementById('selected-database').textContent = database;
         })
         .catch(error => console.error('Error:', error));
@@ -124,7 +123,6 @@ function selectTable(database, table, tableContent) {
     fetch(`/select-table/${database}/${table}`)
         .then(response => response.json())
         .then(data => {
-            // Populate columns
             tableContent.innerHTML = '';
             data.columns.forEach(column => {
                 const columnElement = document.createElement('div');
@@ -149,10 +147,69 @@ function selectTable(database, table, tableContent) {
         .catch(error => console.error('Error:', error));
 }
 
+function createDatabase() {
+    const form = document.getElementById('create-database-form');
+    const dbNameInput = document.getElementById('database_name');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    fetch(form.action, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken
+        },
+        body: JSON.stringify({
+            database_name: dbNameInput.value
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            const databaseMessage = document.getElementById('database-message');
+            databaseMessage.textContent = data.message;
+            databaseMessage.style.display = 'block';
+        }
+
+        if (data.database) {
+            reloadDatabaseList();
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function reloadDatabaseList() {
+    const dbList = document.getElementById('database-list');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    fetch('{{ route("databases") }}', {
+        method: 'GET',
+        headers: {
+            'X-CSRF-TOKEN': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        dbList.innerHTML = '';
+        data.databases.forEach(db => {
+            const newDatabase = document.createElement('div');
+            newDatabase.className = 'database-header list-group-item collapsed';
+            newDatabase.dataset.database = db.full;
+            newDatabase.innerHTML = `<i class="fas fa-database"></i><span>${db.display}</span>`;
+            dbList.appendChild(newDatabase);
+
+            newDatabase.addEventListener('click', function() {
+                closeOtherDatabases(newDatabase);
+                toggleCollapse(newDatabase);
+                selectDatabase(db.full);
+            });
+        });
+    })
+    .catch(error => console.error('Error:', error));
+}
+
 function executeQuery() {
     const queryForm = document.getElementById('query-form');
     const queryResult = document.getElementById('query-result');
-    const selectedDatabase = document.getElementById('selected-database').textContent;
 
     fetch(queryForm.action, {
         method: queryForm.method,
@@ -196,15 +253,78 @@ function executeQuery() {
 
         document.getElementById('editor').value = data.query;
 
-        // Show success message if any
         const databaseMessage = document.getElementById('database-message');
         databaseMessage.textContent = data.message || 'Query executed successfully';
         databaseMessage.style.display = 'block';
 
-        // If a new table was created, refresh the table list
         if (data.query.trim().toLowerCase().startsWith('create table')) {
             selectDatabase(selectedDatabase);
         }
+
+        // Add the executed query to the history
+        addQueryToHistory(data.query, data.timestamp, data.isSuccess, data.errorMessage);
     })
-    .catch(error => console.error('Error:', error));
+    .catch(error => {
+        console.error('Error:', error);
+        addQueryToHistory(document.getElementById('editor').value, new Date().toLocaleTimeString(), false, error.message);
+    });
+}
+
+function addQueryToHistory(query, timestamp, isSuccess, errorMessage) {
+    const queryHistory = document.getElementById('query-history');
+
+    const queryEntry = document.createElement('div');
+    queryEntry.className = 'query-entry';
+    if (isSuccess) {
+        queryEntry.classList.add('success');
+    } else {
+        queryEntry.classList.add('error');
+    }
+
+    const queryIcon = document.createElement('i');
+    queryIcon.className = 'fas fa-database';
+    queryEntry.appendChild(queryIcon);
+
+    const queryContent = document.createElement('pre');
+    queryContent.textContent = query;
+    queryEntry.appendChild(queryContent);
+
+    if (!isSuccess && errorMessage) {
+        const errorContent = document.createElement('div');
+        errorContent.className = 'error-message';
+        errorContent.textContent = errorMessage;
+        queryEntry.appendChild(errorContent);
+    }
+
+    const queryTimestamp = document.createElement('div');
+    queryTimestamp.className = 'query-timestamp';
+    queryTimestamp.textContent = timestamp;
+    queryEntry.appendChild(queryTimestamp);
+
+    queryHistory.appendChild(queryEntry);
+}
+
+function loadHistory(selectedDatabase) {
+    fetch('/get-history', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+        },
+        body: JSON.stringify({
+            selectedDatabase: selectedDatabase
+        })
+    })
+    .then(response => response.json())
+    .then(history => {
+        const queryHistory = document.getElementById('query-history');
+        queryHistory.innerHTML = '';
+
+        history.forEach(item => {
+            addQueryToHistory(item.query, new Date(item.created_at).toLocaleTimeString(), item.is_success, item.error_message);
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
 }
